@@ -40,9 +40,7 @@ export function defaultHeaders(authToken: string) {
     Authorization: `Bearer ${authToken}`,
     "user-agent": "connect-es/1.6.1",
     "Content-Type": "application/proto",
-    "x-cursor-client-version": "1.5.5",
-    // fixed checksum copied from reference script
-    "x-cursor-checksum": "cszO1wTCa3d118d9064243b286622397c32f90d88fea1dddb7704494b2bde832b539fa7d/88b419245f0845eb9a9578d0ec511fa8714736f1c24e409baa07e098e758d3bd",
+    "x-cursor-client-version": "1.5.5"
   };
   return h;
 }
