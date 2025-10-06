@@ -1,4 +1,6 @@
 import { ListToolsRequestSchema, ListToolsResultSchema, CallToolRequestSchema, CompatibilityCallToolResultSchema } from "@modelcontextprotocol/sdk/types";
+import { z } from "zod";
+import { zodToJsonSchema } from "zod-to-json-schema";
 import { createRepositoryIndexer } from "./services/repositoryIndexer";
 import { createCodeSearcher } from "./services/codeSearcher";
 
@@ -8,34 +10,35 @@ export async function createMcpServer(server: any, ctx: ServerContext): Promise<
   const indexer = createRepositoryIndexer(ctx);
   const searcher = createCodeSearcher(ctx, indexer);
 
+  // Zod schemas for tool arguments
+  const indexProjectArgsSchema = z.object({
+    workspacePath: z.string(),
+    verbose: z.boolean().optional(),
+  });
+
+  const codebaseSearchArgsSchema = z.object({
+    query: z.string(),
+    paths_include_glob: z.string().optional(),
+    paths_exclude_glob: z.string().optional(),
+    max_results: z.number().int().positive().optional(),
+  });
+
+  // Generate JSON Schemas for MCP tool inputSchema
+  const indexProjectInputJsonSchema = zodToJsonSchema(indexProjectArgsSchema, "index_project_input");
+  const codebaseSearchInputJsonSchema = zodToJsonSchema(codebaseSearchArgsSchema, "codebase_search_input");
+
   server.setRequestHandler(ListToolsRequestSchema, async () => {
     return ListToolsResultSchema.parse({
       tools: [
         {
           name: "index_project",
-          description: "Initialize or update project index using minimal-set batching and schedule auto-sync.",
-          inputSchema: {
-            type: "object",
-            properties: {
-              workspacePath: { type: "string" },
-              verbose: { type: "boolean" },
-            },
-            required: ["workspacePath"],
-          },
+          description: "Creates or updates a semantic index of the codebase for a given project directory. This is a necessary first step before using `semantic_search`. The indexing process is optimized to be run once; it will then automatically keep the index in sync with file changes. Call this tool to prepare a new project for searching.",
+          inputSchema: indexProjectInputJsonSchema,
         },
         {
-          name: "semantic_search",
-          description: "Search repository with pre-search sync to ensure freshness.",
-          inputSchema: {
-            type: "object",
-            properties: {
-              query: { type: "string" },
-              paths_include_glob: { type: "string" },
-              paths_exclude_glob: { type: "string" },
-              max_results: { type: "number" },
-            },
-            required: ["query"],
-          },
+          name: "codebase_search",
+          description: "Searches the indexed codebase to find code snippets most relevant to a natural language query. This is a semantic search tool, so the query should describe the desired functionality or concept. For best results, use the user's exact phrasing for the `query`, as their specific wording often contains valuable semantic cues. If the search should be limited to specific files or directories, use the `paths_include_glob` and `paths_exclude_glob` parameters to scope the search. Ensure the project has been indexed with `index_project` first.",
+          inputSchema: codebaseSearchInputJsonSchema,
         },
       ],
     });
@@ -44,16 +47,14 @@ export async function createMcpServer(server: any, ctx: ServerContext): Promise<
   server.setRequestHandler(CallToolRequestSchema, async (req: any) => {
     const { name, arguments: args } = req.params as { name: string; arguments?: Record<string, unknown> };
     if (name === "index_project") {
-      const { workspacePath, verbose } = (args || {}) as { workspacePath: string; verbose?: boolean };
+      const { workspacePath, verbose } = indexProjectArgsSchema.parse(args || {});
       const result = await indexer.indexProject({ workspacePath, verbose: !!verbose });
       return CompatibilityCallToolResultSchema.parse({
         content: [{ type: "text", text: JSON.stringify(result) }],
       });
     }
-    if (name === "semantic_search") {
-      const { query, paths_include_glob, paths_exclude_glob, max_results } = (args || {}) as {
-        query: string; paths_include_glob?: string; paths_exclude_glob?: string; max_results?: number;
-      };
+    if (name === "codebase_search") {
+      const { query, paths_include_glob, paths_exclude_glob, max_results } = codebaseSearchArgsSchema.parse(args || {});
       const result = await searcher.search({
         query,
         pathsIncludeGlob: paths_include_glob,

@@ -1,6 +1,6 @@
 ## Cometix Indexer（MCP 服务器）
 
-语义代码搜索的本地索引与检索服务。该项目实现了一个基于 Model Context Protocol（MCP）的服务端，封装了对 Cursor 后端 RepositoryService 的建库、同步与搜索流程，通过两类 MCP 工具对外提供能力：项目索引（index_project）与语义搜索（semantic_search）。
+语义代码搜索的本地索引与检索服务。该项目实现了一个基于 Model Context Protocol（MCP）的服务端，封装了对 Cursor 后端 RepositoryService 的建库、同步与搜索流程，通过两类 MCP 工具对外提供能力：项目索引（index_project）与语义搜索（codebase_search）。
 
 ### 功能概述
 - 索引：扫描本地工作区、生成文件清单、分批上传至 Cursor 服务端并完成建库标记。
@@ -10,7 +10,7 @@
 
 ### 目录结构（核心）
 - `src/index.ts`：进程入口。解析 CLI/环境变量，创建 MCP `Server` 并接入 stdio 传输。
-- `src/server.ts`：注册 MCP 工具：`index_project` 与 `semantic_search`。
+- `src/server.ts`：注册 MCP 工具：`index_project` 与 `codebase_search`。
 - `src/services/repositoryIndexer.ts`：索引与同步核心逻辑（初次建库、分批上传、增量同步、定时器）。
 - `src/services/codeSearcher.ts`：搜索逻辑（预同步、远端搜索、结果解密与规整）。
 - `src/services/fileWatcher.ts`：文件变更监听，标记 `pendingChanges`。
@@ -93,7 +93,7 @@ npm run start -- --auth-token 你的Token
   - 行为：初始化/刷新索引，按批全量上传并计划自动同步；当 `verbose=true` 时，额外返回本轮上传的相对路径文件列表。
   - 返回：`{ codebaseId, uploaded, batches, nextSyncAt }`
 
-- `semantic_search`
+- `codebase_search`
   - 入参：`{ query: string; paths_include_glob?: string; paths_exclude_glob?: string; max_results?: number }`
   - 行为：在“唯一一个”已索引工作区内进行搜索；支持包含/排除 glob 过滤（基于工作区相对路径），并在搜索前进行按需增量同步。
   - 返回：`{ total, hits: Array<{ path, score, startLine, endLine }> }`
@@ -107,7 +107,7 @@ npm run start -- --auth-token 你的Token
 ```
 ```json
 {
-  "name": "semantic_search",
+  "name": "codebase_search",
   "arguments": { "query": "What is the xxx paper", "paths_include_glob": "src/**/*.rs", "paths_exclude_glob": "**/tests/**", "max_results": 50 }
 }
 ```

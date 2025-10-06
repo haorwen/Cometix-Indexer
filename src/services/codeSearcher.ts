@@ -17,7 +17,7 @@ export function createCodeSearcher(ctx: { authToken: string; baseUrl: string }, 
     // Determine the single indexed workspace to search within
     const indexed = await listIndexedWorkspaces();
     if (indexed.length !== 1) {
-      throw new Error("semantic_search requires exactly one indexed workspace. Please ensure a single workspace is indexed.");
+      throw new Error("codebase_search requires exactly one indexed workspace. Please ensure a single workspace is indexed.");
     }
     const workspacePath = indexed[0];
 
