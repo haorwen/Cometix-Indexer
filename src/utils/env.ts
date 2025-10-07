@@ -29,9 +29,7 @@ export function resolveAuthAndBaseUrlFromCliAndEnv(argv: string[]): ResolvedConf
       i++;
     }
   }
-  if (!authToken) {
-    throw new Error("Missing CURSOR_AUTH_TOKEN. Pass --auth-token or set env CURSOR_AUTH_TOKEN");
-  }
+  // Allow starting without token so the MCP server can advertise tools; individual tools will error if token is missing
   return { authToken, baseUrl, logLevel };
 }
 

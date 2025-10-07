@@ -6,7 +6,7 @@ import { listFiles, readEmbeddableFilesList, shouldIgnore } from "../utils/fs";
 import { Semaphore } from "../utils/semaphore";
 import { V1MasterKeyedEncryptionScheme, decryptPathToRelPosix, encryptPathWindows, genPathKey, sha256Hex } from "../crypto/pathEncryption";
 import { ensureIndexCreated, fastRepoInitHandshakeV2, fastRepoSyncComplete, fastUpdateFileV2, syncMerkleSubtreeV2 } from "../client/cursorApi";
-import { loadWorkspaceState, saveWorkspaceState, WorkspaceState } from "./stateManager";
+import { loadWorkspaceState, saveWorkspaceState, WorkspaceState, setRuntimeCodebaseId, getRuntimeCodebaseId } from "./stateManager";
 import { startFileWatcher } from "./fileWatcher";
 
 export type IndexerContext = { authToken: string; baseUrl: string };
@@ -304,7 +304,8 @@ export function createRepositoryIndexer(ctx: IndexerContext) {
       try { const s = fs.statSync(abs); return s.isFile() && s.size <= DEFAULTS.FILE_SIZE_LIMIT_BYTES; } catch { return false; }
     });
     const batches = chunkArray(filtered, DEFAULTS.INITIAL_UPLOAD_MAX_FILES);
-    const repoName = `repo-${Date.now()}`;
+    // Use stable repoName for consistent server mapping; persist it in state
+    const repoName = st.repoName || `local-${require("crypto").createHash("sha256").update(workspacePath).digest("hex").slice(0, 12)}`;
     // perform a full cycle per batch: handshake -> upload -> ensure -> sync complete
     const encryptedToPlainPath: Record<string, string> = {};
     let totalUploaded = 0;
@@ -330,13 +331,16 @@ export function createRepositoryIndexer(ctx: IndexerContext) {
       // ensure + sync complete for this chunk
       await runEnsureAndSyncComplete(ctx.baseUrl, ctx.authToken, repositoryPb, codebaseId, simhash, pathKeyHash);
       lastCodebaseId = codebaseId;
+      setRuntimeCodebaseId(workspacePath, codebaseId);
     }
 
     st = {
       ...st,
       workspacePath,
-      codebaseId: lastCodebaseId!,
       pathKey,
+      codebaseId: lastCodebaseId,
+      repoName,
+      repoOwner: st.repoOwner || "local-user",
       pendingChanges: false,
     };
     await saveWorkspaceState(st);
@@ -349,18 +353,21 @@ export function createRepositoryIndexer(ctx: IndexerContext) {
       scheduleAutoSync(workspacePath);
       scheduled.add(workspacePath);
     }
-    const base = { codebaseId: st.codebaseId, uploaded: totalUploaded, batches: batches.length, nextSyncAt: new Date(Date.now() + 5 * 60 * 1000).toISOString() } as any;
+    const base = { codebaseId: lastCodebaseId!, uploaded: totalUploaded, batches: batches.length, nextSyncAt: new Date(Date.now() + 5 * 60 * 1000).toISOString() } as any;
     if (params.verbose) base.files = uploadedFilesVerbose;
     return base;
   }
 
   async function autoSyncIfNeeded(workspacePath: string) {
     const st = await loadWorkspaceState(workspacePath);
-    if (!st.codebaseId || !st.pathKey || !st.orthogonalTransformSeed) return;
+    const runtimeId = getRuntimeCodebaseId(workspacePath) || st.codebaseId;
+    if (!runtimeId || !st.pathKey || !st.orthogonalTransformSeed) return;
+    // Prime runtime cache if needed
+    if (!getRuntimeCodebaseId(workspacePath) && runtimeId) setRuntimeCodebaseId(workspacePath, runtimeId);
     const merkle = await merkleBuild(workspacePath);
     if (!st.pendingChanges) return;
     const scheme = new V1MasterKeyedEncryptionScheme(st.pathKey);
-    const changed = await incrementalSync(workspacePath, merkle, st.codebaseId, scheme, ctx.baseUrl, ctx.authToken, st.orthogonalTransformSeed);
+    const changed = await incrementalSync(workspacePath, merkle, runtimeId, scheme, ctx.baseUrl, ctx.authToken, st.orthogonalTransformSeed);
     if (changed.length === 0) return;
     // upload changed files
     await uploadFilesChunk(
@@ -368,15 +375,15 @@ export function createRepositoryIndexer(ctx: IndexerContext) {
       workspacePath,
       scheme,
       st.orthogonalTransformSeed,
-      st.codebaseId,
+      runtimeId,
       ctx.baseUrl,
       ctx.authToken,
       {},
     );
     const pathKeyHash = sha256Hex(st.pathKey);
     const simhash = Array.from(await merkle.getSimhash()).map((n) => Number(n));
-    const repositoryPb = createRepositoryPb(workspacePath, st.orthogonalTransformSeed, `repo-${Date.now()}`);
-    await runEnsureAndSyncComplete(ctx.baseUrl, ctx.authToken, repositoryPb, st.codebaseId, simhash, pathKeyHash);
+    const repositoryPb = createRepositoryPb(workspacePath, st.orthogonalTransformSeed, st.repoName || `local-${require("crypto").createHash("sha256").update(workspacePath).digest("hex").slice(0, 12)}`);
+    await runEnsureAndSyncComplete(ctx.baseUrl, ctx.authToken, repositoryPb, runtimeId, simhash, pathKeyHash);
     st.pendingChanges = false;
     await saveWorkspaceState(st);
   }
@@ -387,5 +394,4 @@ export function createRepositoryIndexer(ctx: IndexerContext) {
 
   return { indexProject, autoSyncIfNeeded, scheduleAutoSync };
 }
-
 

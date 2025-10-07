@@ -1,6 +1,5 @@
-import { ListToolsRequestSchema, ListToolsResultSchema, CallToolRequestSchema, CompatibilityCallToolResultSchema } from "@modelcontextprotocol/sdk/types";
+import { ListToolsRequestSchema, ListToolsResultSchema, CallToolRequestSchema, CompatibilityCallToolResultSchema, ListPromptsRequestSchema, ListPromptsResultSchema, ListResourcesRequestSchema, ListResourcesResultSchema } from "@modelcontextprotocol/sdk/types.js";
 import { z } from "zod";
-import { zodToJsonSchema } from "zod-to-json-schema";
 import { createRepositoryIndexer } from "./services/repositoryIndexer";
 import { createCodeSearcher } from "./services/codeSearcher";
 
@@ -23,9 +22,26 @@ export async function createMcpServer(server: any, ctx: ServerContext): Promise<
     max_results: z.number().int().positive().optional(),
   });
 
-  // Generate JSON Schemas for MCP tool inputSchema
-  const indexProjectInputJsonSchema = zodToJsonSchema(indexProjectArgsSchema, "index_project_input");
-  const codebaseSearchInputJsonSchema = zodToJsonSchema(codebaseSearchArgsSchema, "codebase_search_input");
+  // Minimal JSON Schemas for MCP tool inputSchema (top-level must be type: "object")
+  const indexProjectInputJsonSchema = {
+    type: "object",
+    properties: {
+      workspacePath: { type: "string" },
+      verbose: { type: "boolean" },
+    },
+    required: ["workspacePath"],
+  } as const;
+
+  const codebaseSearchInputJsonSchema = {
+    type: "object",
+    properties: {
+      query: { type: "string" },
+      paths_include_glob: { type: "string" },
+      paths_exclude_glob: { type: "string" },
+      max_results: { type: "integer", minimum: 1 },
+    },
+    required: ["query"],
+  } as const;
 
   server.setRequestHandler(ListToolsRequestSchema, async () => {
     return ListToolsResultSchema.parse({
@@ -44,8 +60,25 @@ export async function createMcpServer(server: any, ctx: ServerContext): Promise<
     });
   });
 
+  // No-op prompt/resources handlers to satisfy advertised capabilities
+  server.setRequestHandler(ListPromptsRequestSchema, async () => {
+    return ListPromptsResultSchema.parse({ prompts: [] });
+  });
+
+  server.setRequestHandler(ListResourcesRequestSchema, async () => {
+    return ListResourcesResultSchema.parse({ resources: [] });
+  });
+
   server.setRequestHandler(CallToolRequestSchema, async (req: any) => {
     const { name, arguments: args } = req.params as { name: string; arguments?: Record<string, unknown> };
+    // Friendly guard: ensure auth token is present at call time
+    const missingTokenError = () => CompatibilityCallToolResultSchema.parse({
+      content: [{ type: "text", text: "Missing CURSOR_AUTH_TOKEN. Pass --auth-token or set env CURSOR_AUTH_TOKEN before using this tool." }],
+      isError: true,
+    });
+    if (!ctx.authToken) {
+      return missingTokenError();
+    }
     if (name === "index_project") {
       const { workspacePath, verbose } = indexProjectArgsSchema.parse(args || {});
       const result = await indexer.indexProject({ workspacePath, verbose: !!verbose });

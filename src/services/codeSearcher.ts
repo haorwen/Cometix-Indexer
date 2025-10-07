@@ -36,11 +36,12 @@ export function createCodeSearcher(ctx: { authToken: string; baseUrl: string }, 
       orthogonalTransformSeed: st.orthogonalTransformSeed || 0,
       preferredEmbeddingModel: "EMBEDDING_MODEL_UNSPECIFIED",
       workspaceUri: "",
-      repoName: `repo-${Date.now()}`,
-      repoOwner: "local-user",
+      // Reuse stable identity from state; fall back to deterministic default
+      repoName: st.repoName || `local-${require("crypto").createHash("sha256").update(workspacePath).digest("hex").slice(0, 12)}`,
+      repoOwner: st.repoOwner || "local-user",
       remoteUrls: [],
       remoteNames: [],
-    };
+    } as any;
     const res = await searchRepositoryV2(ctx.baseUrl, ctx.authToken, {
       query: params.query,
       repository: repositoryPb,
@@ -76,5 +77,4 @@ export function createCodeSearcher(ctx: { authToken: string; baseUrl: string }, 
   }
   return { search };
 }
-
 

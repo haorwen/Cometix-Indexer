@@ -7,6 +7,8 @@ export type WorkspaceState = {
   codebaseId?: string;
   pathKey?: string;
   orthogonalTransformSeed?: number;
+  repoName?: string;
+  repoOwner?: string;
   // Ephemeral (not persisted):
   pendingChanges?: boolean;
 };
@@ -34,6 +36,8 @@ export async function saveWorkspaceState(st: WorkspaceState): Promise<void> {
     codebaseId: st.codebaseId,
     pathKey: st.pathKey,
     orthogonalTransformSeed: st.orthogonalTransformSeed,
+    repoName: st.repoName,
+    repoOwner: st.repoOwner,
   };
   await fs.writeJSON(file, toPersist, { spaces: 2 });
 }
@@ -65,4 +69,18 @@ export async function listIndexedWorkspaces(): Promise<string[]> {
   return Array.from(out);
 }
 
+// Runtime-only cache for codebaseId mapping; persisted copy lives in state.json.
+const runtimeCodebaseIds = new Map<string, string>();
+
+export function setRuntimeCodebaseId(workspacePath: string, codebaseId: string): void {
+  runtimeCodebaseIds.set(workspacePath, codebaseId);
+}
+
+export function getRuntimeCodebaseId(workspacePath: string): string | undefined {
+  return runtimeCodebaseIds.get(workspacePath);
+}
+
+export function clearRuntimeCodebaseId(workspacePath: string): void {
+  runtimeCodebaseIds.delete(workspacePath);
+}
 

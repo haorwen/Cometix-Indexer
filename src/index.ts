@@ -1,5 +1,5 @@
-import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio";
-import { Server } from "@modelcontextprotocol/sdk/server";
+import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { createMcpServer } from "./server";
 import { resolveAuthAndBaseUrlFromCliAndEnv } from "./utils/env";
 
