@@ -87,6 +87,27 @@ npm run start -- --auth-token 你的Token
 - `PROTO_SEARCH_TIMEOUT_MS`（默认 60000）
 - `AUTO_SYNC_INTERVAL_MS`（默认 5 分钟）
 
+### MCP安装
+#### Claude Code
+```
+{
+  "mcpServers": {
+    "cometix-indexer": {
+      "command": "npm",
+      "args": [
+        "--prefix",
+        "<path>",
+        "run",
+        "start"
+      ],
+      "env": {
+        "CURSOR_AUTH_TOKEN": ""
+      }
+    }
+  }
+}
+```
+
 ### MCP 工具
 - `index_project`
   - 入参：`{ workspacePath: string; verbose?: boolean }`
