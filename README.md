@@ -3,10 +3,11 @@
 语义代码搜索的本地索引与检索服务。该项目实现了一个基于 Model Context Protocol（MCP）的服务端，封装了对 Cursor 后端 RepositoryService 的建库、同步与搜索流程，通过两类 MCP 工具对外提供能力：项目索引（index_project）与语义搜索（codebase_search）。
 
 ### TODOs
-- Cursor Indexing(ok)
-- Warp Embedding
-- Trae Indexing
-- Augment Indexing
+- [x]  Cursor Indexing(ok)
+- [ ] Warp Embedding
+- [ ] Trae Indexing
+- [ ] Augment Indexing
+- [ ] Github Indexing(来源Copilot Indexing)
 
 ### 功能概述
 - 索引：扫描本地工作区、生成文件清单、分批上传至 Cursor 服务端并完成建库标记。
