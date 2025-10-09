@@ -15,6 +15,75 @@
 - 语义搜索：调用远端检索接口并自动解密返回的加密路径，直观展示命中。
 - 运行形态：作为 MCP 服务器通过 stdio 运行并响应工具调用。
 
+## MCP
+### Claude Code
+#### npx格式
+```
+{
+  "mcpServers": {
+    "cometix-indexer": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "--package=git+https://github.com/CometixAI/Cometix-Indexer.git",
+        "cometix-indexer",
+        "start"
+      ],
+      "env": {
+        "CURSOR_AUTH_TOKEN": "",
+        "CURSOR_BASE_URL": "https://api2.cursor.sh"
+      }
+    }
+  }
+}
+````
+
+#### npm格式(Local)
+```
+{
+  "mcpServers": {
+    "cometix-indexer": {
+      "command": "npm",
+      "args": [
+        "--prefix",
+        "<path>",
+        "run",
+        "start"
+      ],
+      "env": {
+        "CURSOR_AUTH_TOKEN": "",
+        "CURSOR_BASE_URL": "https://api2.cursor.sh"
+      }
+    }
+  }
+}
+```
+
+### MCP 工具
+- `index_project`
+  - 入参：`{ workspacePath: string; verbose?: boolean }`
+  - 行为：初始化/刷新索引，按批全量上传并计划自动同步；当 `verbose=true` 时，额外返回本轮上传的相对路径文件列表。
+  - 返回：`{ codebaseId, uploaded, batches, nextSyncAt }`
+
+- `codebase_search`
+  - 入参：`{ query: string; paths_include_glob?: string; paths_exclude_glob?: string; max_results?: number }`
+  - 行为：在“唯一一个”已索引工作区内进行搜索；支持包含/排除 glob 过滤（基于工作区相对路径），并在搜索前进行按需增量同步。
+  - 返回：`{ total, hits: Array<{ path, score, startLine, endLine }> }`
+
+示例（概念性）：
+```json
+{
+  "name": "index_project",
+  "arguments": { "workspacePath": "E:/project" }
+}
+```
+```json
+{
+  "name": "codebase_search",
+  "arguments": { "query": "What is the xxx paper", "paths_include_glob": "src/**/*.rs", "paths_exclude_glob": "**/tests/**", "max_results": 50 }
+}
+```
+
 ### 目录结构（核心）
 - `src/index.ts`：进程入口。解析 CLI/环境变量，创建 MCP `Server` 并接入 stdio 传输。
 - `src/server.ts`：注册 MCP 工具：`index_project` 与 `codebase_search`。
@@ -55,10 +124,9 @@
 - Node.js >= 18
 - `proto/repository_service.proto` 必须存在（仓库已附带）。
 
-### 安装与构建
+### 启动（npx）
 ```bash
-npm install
-npm run build
+npx -y --package=git+https://github.com/CometixAI/Cometix-Indexer.git cometix-indexer -- --auth-token "$CURSOR_AUTH_TOKEN" --base-url https://api2.cursor.sh
 ```
 
 ### 启动（npm scripts）
@@ -94,50 +162,10 @@ npm run start -- --auth-token 你的Token
 - `PROTO_SEARCH_TIMEOUT_MS`（默认 60000）
 - `AUTO_SYNC_INTERVAL_MS`（默认 5 分钟）
 
-### MCP安装
-#### Claude Code
-```
-{
-  "mcpServers": {
-    "cometix-indexer": {
-      "command": "npm",
-      "args": [
-        "--prefix",
-        "<path>",
-        "run",
-        "start"
-      ],
-      "env": {
-        "CURSOR_AUTH_TOKEN": ""
-      }
-    }
-  }
-}
-```
-
-### MCP 工具
-- `index_project`
-  - 入参：`{ workspacePath: string; verbose?: boolean }`
-  - 行为：初始化/刷新索引，按批全量上传并计划自动同步；当 `verbose=true` 时，额外返回本轮上传的相对路径文件列表。
-  - 返回：`{ codebaseId, uploaded, batches, nextSyncAt }`
-
-- `codebase_search`
-  - 入参：`{ query: string; paths_include_glob?: string; paths_exclude_glob?: string; max_results?: number }`
-  - 行为：在“唯一一个”已索引工作区内进行搜索；支持包含/排除 glob 过滤（基于工作区相对路径），并在搜索前进行按需增量同步。
-  - 返回：`{ total, hits: Array<{ path, score, startLine, endLine }> }`
-
-示例（概念性）：
-```json
-{
-  "name": "index_project",
-  "arguments": { "workspacePath": "E:/project" }
-}
-```
-```json
-{
-  "name": "codebase_search",
-  "arguments": { "query": "What is the xxx paper", "paths_include_glob": "src/**/*.rs", "paths_exclude_glob": "**/tests/**", "max_results": 50 }
-}
+### 开发安装与构建
+```bash
+npm install
+npm run build
 ```
 
 ### 状态与数据持久化

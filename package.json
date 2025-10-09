@@ -2,10 +2,13 @@
   "name": "cometix-indexer",
   "version": "0.0.1",
   "description": "Cometix Indexer - MCP server for semantic codebase search with Cursor API integration",
-  "main": "dist/index.js",
+  "type": "module",
+  "bin": {
+    "cometix-indexer": "dist/index.js"
+  },
   "scripts": {
-    "build": "tsc",
-    "build:selective": "npm run build && echo 'Build completed. Use --embeddable-files-path parameter in index_project tool for selective file processing.'",
+    "build": "tsc -p .",
+    "prepare": "npm run build",
     "dev": "tsc --watch",
     "start": "node dist/index.js",
     "start:with-token": "node dist/index.js --auth-token",
@@ -50,5 +53,6 @@
   },
   "engines": {
     "node": ">=18.0.0"
-  }
+  },
+  "files": ["dist", "proto", "README.md"]
 }
