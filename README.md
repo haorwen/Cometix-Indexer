@@ -58,6 +58,7 @@
   }
 }
 ```
+用这种方式需要`npm install && npm run build`。
 
 ### MCP 工具
 - `index_project`
