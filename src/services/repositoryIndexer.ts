@@ -1,13 +1,14 @@
 import path from "path";
 import fs from "fs-extra";
 import { MerkleClient } from "@anysphere/file-service";
-import { DEFAULTS } from "../utils/env";
-import { listFiles, readEmbeddableFilesList, shouldIgnore } from "../utils/fs";
-import { Semaphore } from "../utils/semaphore";
-import { V1MasterKeyedEncryptionScheme, decryptPathToRelPosix, encryptPathWindows, genPathKey, sha256Hex } from "../crypto/pathEncryption";
-import { ensureIndexCreated, fastRepoInitHandshakeV2, fastRepoSyncComplete, fastUpdateFileV2, syncMerkleSubtreeV2 } from "../client/cursorApi";
-import { loadWorkspaceState, saveWorkspaceState, WorkspaceState, setRuntimeCodebaseId, getRuntimeCodebaseId } from "./stateManager";
-import { startFileWatcher } from "./fileWatcher";
+import { DEFAULTS } from "../utils/env.js";
+import { listFiles, readEmbeddableFilesList, shouldIgnore } from "../utils/fs.js";
+import { Semaphore } from "../utils/semaphore.js";
+import { V1MasterKeyedEncryptionScheme, decryptPathToRelPosix, encryptPathWindows, genPathKey, sha256Hex } from "../crypto/pathEncryption.js";
+import { ensureIndexCreated, fastRepoInitHandshakeV2, fastRepoSyncComplete, fastUpdateFileV2, syncMerkleSubtreeV2 } from "../client/cursorApi.js";
+import { loadWorkspaceState, saveWorkspaceState, WorkspaceState, setRuntimeCodebaseId, getRuntimeCodebaseId } from "./stateManager.js";
+import { startFileWatcher } from "./fileWatcher.js";
+import crypto from "crypto";
 
 export type IndexerContext = { authToken: string; baseUrl: string };
 
@@ -305,7 +306,7 @@ export function createRepositoryIndexer(ctx: IndexerContext) {
     });
     const batches = chunkArray(filtered, DEFAULTS.INITIAL_UPLOAD_MAX_FILES);
     // Use stable repoName for consistent server mapping; persist it in state
-    const repoName = st.repoName || `local-${require("crypto").createHash("sha256").update(workspacePath).digest("hex").slice(0, 12)}`;
+    const repoName = st.repoName || `local-${crypto.createHash("sha256").update(workspacePath).digest("hex").slice(0, 12)}`;
     // perform a full cycle per batch: handshake -> upload -> ensure -> sync complete
     const encryptedToPlainPath: Record<string, string> = {};
     let totalUploaded = 0;
@@ -382,7 +383,7 @@ export function createRepositoryIndexer(ctx: IndexerContext) {
     );
     const pathKeyHash = sha256Hex(st.pathKey);
     const simhash = Array.from(await merkle.getSimhash()).map((n) => Number(n));
-    const repositoryPb = createRepositoryPb(workspacePath, st.orthogonalTransformSeed, st.repoName || `local-${require("crypto").createHash("sha256").update(workspacePath).digest("hex").slice(0, 12)}`);
+    const repositoryPb = createRepositoryPb(workspacePath, st.orthogonalTransformSeed, st.repoName || `local-${crypto.createHash("sha256").update(workspacePath).digest("hex").slice(0, 12)}`);
     await runEnsureAndSyncComplete(ctx.baseUrl, ctx.authToken, repositoryPb, runtimeId, simhash, pathKeyHash);
     st.pendingChanges = false;
     await saveWorkspaceState(st);

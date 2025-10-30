@@ -1,7 +1,7 @@
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
-import { createMcpServer } from "./server";
-import { resolveAuthAndBaseUrlFromCliAndEnv } from "./utils/env";
+import { createMcpServer } from "./server.js";
+import { resolveAuthAndBaseUrlFromCliAndEnv } from "./utils/env.js";
 
 async function main() {
   const { authToken, baseUrl, logLevel } = resolveAuthAndBaseUrlFromCliAndEnv(process.argv.slice(2));
